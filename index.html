@@ -1,19 +1,206 @@
-<!DOCTYPE html>
 <html>
-
   <head>
-    <script src="index.js"></script>
     <style>
       * {
-          padding: 0;
-          margin: 0;
+        padding: 0;
+        margin: 0;
+      }
+
+      .source {
+        position: absolute;
+        top: 0;
+        right: 0;
+        height: 32px;
+        margin: 20px;
       }
     </style>
   </head>
 
-  <body onload="run()" style="background:black">
-    <canvas id="scene" width="500px" height="500px" style="background:black; display: block; margin: 0 auto"></canvas>
-    <a href="https://github.com/anvaka/atree"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_red_aa0000.png" alt="Fork me on GitHub"></a>
-  </body>
+  <body onload="run()" style="background: black">
+    <canvas
+      id="scene"
+      width="500px"
+      height="500px"
+      style="background: black; display: block; margin: 0 auto"
+    ></canvas>
+    <a href="https://github.com/Sparkenstein/christmas-tree.git" target="_blank">
+      <img src="GitHub-Mark-64px.png" alt="Source" class="source"
+    /></a>
+    <script>
+      var thetamin = 0;
+      let thetamax = 19 * Math.PI;
+      let period = 15;
+      let linespacing = 0.03;
+      let linelength = 0.015;
+      let yscreenoffset = 340;
+      let xscreenoffset = 250;
+      let xscreenscale = 500;
+      let yscreenscale = 500;
+      let ycamera = 2.1;
+      let zcamera = -3.2;
+      let rate = 1 / (2 * Math.PI); // every rotation y gets one bigge;
+      let factor = rate / 3;
+      const canvas = document.getElementById("scene");
+      var ctx = document.getElementById("scene").getContext("2d");
 
+      function run() {
+        spirals = [
+          new Spiral({
+            foreground: "#220000", // Second shadow for red spiral
+            angleoffset: Math.PI * 0.92,
+            factor: 0.9 * factor,
+          }),
+          new Spiral({
+            foreground: "#002211", // Second shadow for cyan spiral
+            angleoffset: -Math.PI * 0.08,
+            factor: 0.9 * factor,
+          }),
+          new Spiral({
+            foreground: "#660000", // red spiral shadow
+            angleoffset: Math.PI * 0.95,
+            factor: 0.93 * factor,
+          }),
+          new Spiral({
+            foreground: "#003322", // cyan spiral shadow
+            angleoffset: -Math.PI * 0.05,
+            factor: 0.93 * factor,
+          }),
+          new Spiral({
+            foreground: "#ff0000", // red Spiral
+            angleoffset: Math.PI,
+            factor: factor,
+          }),
+          new Spiral({
+            foreground: "#00ffcc", // cyan spiral
+            angleoffset: 0,
+            factor: factor,
+          }),
+          new Spiral({
+            foreground: "#ff00feaa", // pink Spiral
+            angleoffset: -Math.PI,
+            factor: -0.59 * factor,
+          }),
+        ];
+
+        renderFrame(); // animation loop starts here
+
+        function renderFrame() {
+          requestAnimationFrame(renderFrame);
+
+          ctx.clearRect(0, 0, 500, 500);
+          ctx.beginPath();
+          spirals.forEach(renderSpiral);
+        }
+
+        function renderSpiral(spiral) {
+          spiral.render(ctx);
+        }
+
+        function Spiral(config) {
+          var offset = 10;
+          var lineSegments = computeLineSegments();
+
+          this.render = function (ctx) {
+            offset -= 1;
+            if (offset <= -period) {
+              offset += period;
+            }
+
+            if (lineSegments[offset]) {
+              lineSegments[offset].forEach(drawLineSegment);
+            }
+          };
+
+          function drawLineSegment(segment) {
+            stroke(config.foreground, segment.start.alpha);
+            ctx.moveTo(segment.start.x, segment.start.y);
+            ctx.lineTo(segment.end.x, segment.end.y);
+          }
+
+          function computeLineSegments() {
+            var lineSegments = {};
+            var factor = config.factor;
+            var thetanew, thetaold;
+            for (var offset = 0; offset > -period; offset--) {
+              lineSegments[offset] = lines = [];
+              for (
+                var theta =
+                  thetamin +
+                  getdtheta(
+                    thetamin,
+                    (offset * linespacing) / period,
+                    rate,
+                    factor
+                  );
+                theta < thetamax;
+                theta += getdtheta(theta, linespacing, rate, factor)
+              ) {
+                thetaold = theta >= thetamin ? theta : thetamin;
+                thetanew = theta + getdtheta(theta, linelength, rate, factor);
+
+                if (thetanew <= thetamin) {
+                  continue;
+                }
+
+                lines.push({
+                  start: getPointByAngle(
+                    thetaold,
+                    factor,
+                    config.angleoffset,
+                    rate
+                  ),
+                  end: getPointByAngle(
+                    thetanew,
+                    factor,
+                    config.angleoffset,
+                    rate
+                  ),
+                });
+              }
+            }
+
+            return lineSegments;
+          }
+        }
+
+        function stroke(color, alpha) {
+          ctx.closePath();
+          ctx.stroke();
+          ctx.strokeStyle = color;
+          ctx.globalAlpha = alpha;
+          ctx.beginPath();
+        }
+
+        function getPointByAngle(theta, factor, angleoffset, rate) {
+          var x = theta * factor * Math.cos(theta + angleoffset);
+          var z = -theta * factor * Math.sin(theta + angleoffset);
+          var y = rate * theta;
+          var point = projectTo2d(x, y, z);
+          point.alpha =
+            Math.atan((((y * factor) / rate) * 0.1 + 0.02 - z) * 40) * 0.35 +
+            0.65;
+
+          return point;
+        }
+
+        function getdtheta(theta, lineLength, rate, factor) {
+          return (
+            lineLength /
+            Math.sqrt(rate * rate + factor * factor * theta * theta)
+          );
+        }
+
+        function projectTo2d(x, y, z) {
+          return {
+            x: xscreenoffset + xscreenscale * (x / (z - zcamera)),
+            y: yscreenoffset + yscreenscale * ((y - ycamera) / (z - zcamera)),
+          };
+        }
+
+        function requestAnimationFrame(callback) {
+          window.setTimeout(callback, 1000 / 94);
+        }
+      }
+    </script>
+  </body>
 </html>
